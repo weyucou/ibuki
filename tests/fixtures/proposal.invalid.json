@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "tenant": "weyucou",
+  "project": "ibuki",
+  "feature_id": "Bad ID with spaces",
+  "title": "Intentionally broken fixture for CI failure-mode coverage",
+  "intent": "Exercise the validator. This payload must be rejected: feature_id has invalid characters, state is not a known enum, scope.in is empty, and proposer.type is invalid.",
+  "scope": {
+    "in": [],
+    "out": []
+  },
+  "acceptance_criteria": [
+    "The validator MUST reject this payload."
+  ],
+  "proposer": {
+    "type": "robot",
+    "id": "ci-fixture"
+  },
+  "submitted_at": "2026-05-18T00:00:00Z",
+  "state": "not-a-real-state"
+}

@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/weyucou/ibuki/main/schema/v0.1.0/proposal.schema.json",
+  "title": "ibuki Feature Change Request",
+  "description": "Atomic unit of the ibuki proposal workflow. Submitted via MCP, validated against this schema by the rule engine before the LLM judge is invoked. Accepted proposals become locked feature specs; locked specs bundle into release manifests.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tenant",
+    "project",
+    "feature_id",
+    "title",
+    "intent",
+    "scope",
+    "acceptance_criteria",
+    "proposer",
+    "submitted_at",
+    "state"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Version of this schema the payload conforms to. Semver string; must match the directory under schema/. Embedded in every payload so the rule engine can route to the correct validator.",
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "tenant": {
+      "description": "GitHub organization slug. Defines the tenant boundary (one tenant per GitHub org).",
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,37}[a-z0-9])?$"
+    },
+    "project": {
+      "description": "GitHub repository name within the tenant org.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "feature_id": {
+      "description": "Identifier for this feature, unique within (tenant, project). Kebab-case slug; convention is `feature-NNN-short-description` or a stable slug.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "title": {
+      "description": "Short human-readable title for the feature.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "intent": {
+      "description": "Why this feature exists. The outcome the proposer is trying to reach or the problem they are trying to solve.",
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "description": "What is and is not covered by this proposal.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["in", "out"],
+      "properties": {
+        "in": {
+          "description": "Bullet items explicitly in scope. At least one item required.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "out": {
+          "description": "Bullet items explicitly out of scope. May be empty.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "acceptance_criteria": {
+      "description": "Testable conditions that define done. Prefer EARS notation (Ubiquitous, Event-driven, State-driven, Unwanted, Optional). At least one criterion required.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "supersedes": {
+      "description": "Optional foreign-key reference to a feature_id this proposal replaces. On lock, the superseded feature transitions to state=superseded.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "proposer": {
+      "description": "Human or agent that submitted this proposal.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "description": "Whether the proposer is a human or an automated agent.",
+          "type": "string",
+          "enum": ["human", "agent"]
+        },
+        "id": {
+          "description": "Stable identifier for the proposer (e.g. GitHub username for humans, agent identifier for agents).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "name": {
+          "description": "Optional human-readable display name.",
+          "type": "string",
+          "maxLength": 100
+        }
+      }
+    },
+    "submitted_at": {
+      "description": "RFC 3339 / ISO 8601 timestamp at which this payload was submitted. Must be UTC (suffix `Z`) or an explicit offset.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "state": {
+      "description": "Lifecycle state of this feature proposal. New submissions start as `proposed`; the proposal workflow transitions to `locked`, `superseded`, or `retired`.",
+      "type": "string",
+      "enum": ["proposed", "locked", "superseded", "retired"]
+    }
+  }
+}

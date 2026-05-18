@@ -57,6 +57,20 @@ Submit  →  Rule check  →  LLM judge  →  Verdict  ↔  Proposer response  �
 
 The current issues that implement these pillars are tracked on the [Ibuki project board](https://github.com/orgs/weyucou/projects/12).
 
+## Schema
+
+The feature change-request schema (pillar 1) is the atomic unit of the ibuki workflow.
+
+- Schema: [`schema/v0.1.0/proposal.schema.json`](schema/v0.1.0/proposal.schema.json) (JSON Schema Draft 2020-12)
+- Reference payload: [`templates/proposal.example.json`](templates/proposal.example.json)
+- Field reference: [`docs/schema.md`](docs/schema.md)
+
+Validate a payload locally:
+
+```bash
+uvx check-jsonschema --schemafile schema/v0.1.0/proposal.schema.json <your-proposal>.json
+```
+
 ## Status
 
 Pre-implementation. Goals are locked as of 2026-05-18 (see [#6](https://github.com/weyucou/ibuki/issues/6)). Pillar issues are being re-scoped against the locked vision before implementation work begins.
