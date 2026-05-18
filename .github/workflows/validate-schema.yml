@@ -1,0 +1,53 @@
+name: validate-schema
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-schema:
+    name: Validate schema and reference template
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Validate schema against JSON Schema Draft 2020-12 meta-schema
+        run: uvx check-jsonschema --check-metaschema schema/v0.1.0/proposal.schema.json
+
+      - name: Validate reference template against schema
+        run: uvx check-jsonschema --schemafile schema/v0.1.0/proposal.schema.json templates/proposal.example.json
+
+      - name: Confirm invalid fixture is rejected
+        run: |
+          if uvx check-jsonschema --schemafile schema/v0.1.0/proposal.schema.json tests/fixtures/proposal.invalid.json; then
+            echo "::error::Invalid fixture was accepted by the schema — failure mode is not exercised."
+            exit 1
+          else
+            echo "Invalid fixture correctly rejected."
+          fi
+
+  gitleaks:
+    name: Scan for secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            | sudo tar xz -C /usr/local/bin gitleaks
+
+      - name: Scan repository
+        run: gitleaks detect --source . --redact --verbose
