@@ -57,6 +57,10 @@ Submit  →  Rule check  →  LLM judge  →  Verdict  ↔  Proposer response  �
 
 The current issues that implement these pillars are tracked on the [Ibuki project board](https://github.com/orgs/weyucou/projects/12).
 
+Per-pillar design docs land under [`docs/pillars/`](docs/pillars/) as each pillar's design is locked:
+
+- Pillar 2 — [MCP server + tenant auth](docs/pillars/02-mcp-server-tenant-auth.md)
+
 ## Schema
 
 The feature change-request schema (pillar 1) is the atomic unit of the ibuki workflow.
