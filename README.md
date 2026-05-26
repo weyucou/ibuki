@@ -75,6 +75,14 @@ Validate a payload locally:
 uvx check-jsonschema --schemafile schema/v0.1.0/proposal.schema.json <your-proposal>.json
 ```
 
+## Related Repositories
+
+| Repository | Purpose |
+|---|---|
+| [`weyucou/ibuki`](https://github.com/weyucou/ibuki) | Meta/spec repo (this repo) — schema, design docs, project board |
+| [`weyucou/ibuki-backend`](https://github.com/weyucou/ibuki-backend) | Django 5.2 LTS backend + MCP server |
+| [`weyucou/ibuki-infra`](https://github.com/weyucou/ibuki-infra) | AWS CloudFormation infrastructure (Postgres + Fargate) |
+
 ## Status
 
 Pre-implementation. Goals are locked as of 2026-05-18 (see [#6](https://github.com/weyucou/ibuki/issues/6)). Pillar issues are being re-scoped against the locked vision before implementation work begins.
