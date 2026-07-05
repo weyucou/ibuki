@@ -60,6 +60,7 @@ The current issues that implement these pillars are tracked on the [Ibuki projec
 Per-pillar design docs land under [`docs/pillars/`](docs/pillars/) as each pillar's design is locked:
 
 - Pillar 2 — [MCP server + tenant auth](docs/pillars/02-mcp-server-tenant-auth.md)
+- Pillar 3 — [Proposal workflow engine](docs/pillars/03-proposal-workflow-engine.md)
 
 ## Schema
 
