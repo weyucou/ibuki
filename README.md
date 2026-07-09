@@ -1,12 +1,12 @@
 # ibuki
 
-A multi-tenant, multi-project, version-controlled specification and feature management system for AI agent development — so that human-authored intent and AI-executed implementation stay in sync.
+A multi-tenant, multi-project, version-controlled spec management system that coordinates the changes and direction of a project across everyone working on it — multiple developers and AI agents. It gives them one authoritative source of truth for what the project is building and a controlled workflow for proposing and locking direction, so human-authored intent and AI-executed implementation stay in sync and concurrent contributors stay aligned rather than drifting or conflicting.
 
 ## Goals
 
 ### Mission
 
-Provide AI agents (and humans) with a single, queryable source of truth for what a project is building, and a structured workflow for proposing, evaluating, locking, and releasing feature changes.
+Coordinate the changes and direction of a project across everyone working on it — multiple developers and AI agents — by giving them a single, queryable source of truth for what the project is building, and a structured workflow for proposing, evaluating, locking, and releasing feature changes. Concurrent contributors align on one authoritative spec instead of drifting apart or making conflicting choices.
 
 ### Architecture
 
