@@ -91,6 +91,7 @@ class Release(models.Model):
     predecessor = FK("self", null=True, on_delete=PROTECT, related_name="successors")
     manifest_hash = CharField(max_length=64)                             # sha256 hex
     manifest_json = JSONField()                                          # the hashed document, verbatim
+    lock_watermark = DateTimeField(null=True)                            # max(item.locked_at); child 3 populates — see open item 3
     # UniqueConstraint(tenant, version); Index(tenant, -cut_at)
 
 class ReleaseItem(models.Model):
@@ -180,6 +181,8 @@ where `document` is every manifest field **except** `manifest_hash`, with dateti
    ).order_by("locked_at", "pk")
    ```
    `pk` is the tiebreaker — `locked_at` is not unique.
+
+   **Provisional** — this lower bound is the known defect described in [open item 3](#open-items): a lock that stamps `locked_at` before a cut but commits after it is never bundled. Child 3 replaces `predecessor.cut_at` here with the stored `lock_watermark`; `cut_at` stays the honest wall-clock cut time in the manifest.
 4. Empty → `EmptyReleaseError` (`EMPTY_RELEASE`).
 5. Resolve the version: validate `name` against the scheme if supplied, else `next_version(...)`.
 6. Generate `release_id` (UUID) and `cut_at`, build the manifest document, compute `manifest_hash`, then insert the `Release` and its `ReleaseItem` rows — one write each, no follow-up UPDATE.
@@ -211,7 +214,7 @@ Four tools in the existing `backend/mcp_server/tools.py`, registered in `build_m
 | `ibuki.get_release` | `{ release_id }` | `{ found, release }` — absent is a well-formed result |
 | `ibuki.list_releases` | `{ limit?, before_cut_at? }` | `{ releases: [...], next_cursor? }` — newest first, cursor on `cut_at` |
 
-No tool takes a `tenant` or `project` argument. `mcp_server/auth.py` already resolves the bearer token to an `ApiToken` but binds only `api_token.tenant` into the tenant context; child 4 extends `mcp_server/context.py` with `current_token()` so `cut_by` can never be client-supplied.
+No tool takes a `tenant` or `project` argument. `get_release` and `list_releases` filter on `tenant=current_tenant()`; a `release_id` owned by another tenant returns `{"found": false, "release": null}` — not-found rather than `TENANT_MISMATCH`, so the response does not confirm the id exists — and emits a `tool.tenant_mismatch` warning log, matching the shipped `_get_spec_by_id()` precedent. `mcp_server/auth.py` already resolves the bearer token to an `ApiToken` but binds only `api_token.tenant` into the tenant context; child 4 extends `mcp_server/context.py` with `current_token()` so `cut_by` can never be client-supplied.
 
 `ReleaseErrorCode` (`StrEnum`, SCREAMING values, per `conformance.schemas.CheckErrorCode`):
 
@@ -281,6 +284,7 @@ The epic stays in `weyucou/ibuki`; the four children land in `weyucou/ibuki-back
 | Queryable via MCP | `test_tools.py::test_get_and_list_round_trip` |
 | Concurrent cut | `test_cut_release.py::test_concurrent_cut_returns_structured_error` (two connections, `TransactionTestCase`) |
 | Tenant isolation | `test_tools.py::test_list_releases_excludes_other_tenant` |
+| Cross-tenant `release_id` is not-found | `test_tools.py::test_get_release_excludes_other_tenant` |
 
 The concurrency test needs two real connections, so it is a `TransactionTestCase` against Postgres 17 in CI — `select_for_update(nowait=True)` is unobservable inside a single wrapped transaction.
 
@@ -303,5 +307,5 @@ Resolve before or within the child issues named:
    - (b) `ibuki.lock` takes the content as a tool argument — re-opens the trust boundary the rule engine closed, and lets a caller lock content the judge never saw. Not recommended.
    - (c) Pillar 4 adds the field to `proposals` itself — cross-pillar model ownership, and #18 would still have to write it.
 2. **DECISION 3 — date-scheme exhaustion** (child 2). 27+ cuts in one calendar month: fail with `VERSION_EXHAUSTED` (plan default, recommended) or auto-extend to `-AA`, `-AB`, …? 27 cuts in a month is a signal, not a case to accommodate silently. Trivial to relax later.
-3. **Cut-window watermark** (child 3). Selecting on `locked_at > predecessor.cut_at` can drop a lock that committed late: a lock transaction that stamps `locked_at = t0` but commits after a cut whose `cut_at = t2 > t0` is invisible to that cut's selection query, and the next cut's `locked_at > t2` filter excludes it too — so it is never released. Under Postgres' default READ COMMITTED this is reachable whenever a lock and a cut overlap. Recommended fix, for the child-3 author to confirm: derive the window's upper bound from the rows actually selected (store `max(item.locked_at)` as the watermark and filter the next cut against it), keeping `cut_at` as the honest wall-clock cut time in the manifest. A `TransactionTestCase` reproducing the interleave should land with the fix.
+3. **Cut-window watermark** (child 3). Selecting on `locked_at > predecessor.cut_at` can drop a lock that committed late: a lock transaction that stamps `locked_at = t0` but commits after a cut whose `cut_at = t2 > t0` is invisible to that cut's selection query, and the next cut's `locked_at > t2` filter excludes it too — so it is never released. Under Postgres' default READ COMMITTED this is reachable whenever a lock and a cut overlap. Recommended fix, for the child-3 author to confirm: derive the window's upper bound from the rows actually selected (store `max(item.locked_at)` as the watermark and filter the next cut against it), keeping `cut_at` as the honest wall-clock cut time in the manifest. A `TransactionTestCase` reproducing the interleave should land with the fix. The nullable `lock_watermark` column is already in the locked data model so child 1 ships it in `0001_initial`; child 3 populates it and switches the selection query to it.
 4. **Read-only Django admin** (child 1). `admin.py` must not offer add/change/delete for `Release` or `ReleaseItem` — the model guards raise, so an editable admin form would surface a 500 instead of a disabled control.
