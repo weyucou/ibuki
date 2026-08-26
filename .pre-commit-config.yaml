@@ -12,6 +12,15 @@ repos:
           - --schemafile
           - schema/v0.1.0/proposal.schema.json
 
+  - repo: local
+    hooks:
+      - id: check-projection-table
+        name: Check the role/field table against the canonical projection map
+        entry: python3 scripts/check_projection_table.py
+        language: system
+        pass_filenames: false
+        files: ^(docs/agent-consumption\.md|schema/v0\.1\.0/(role-projections|proposal\.schema)\.json)$
+
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
