@@ -35,6 +35,9 @@ jobs:
             echo "Invalid fixture correctly rejected."
           fi
 
+      - name: Check the role/field table against the canonical projection map
+        run: python3 scripts/check_projection_table.py
+
   gitleaks:
     name: Scan for secrets
     runs-on: ubuntu-latest
