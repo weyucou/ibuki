@@ -60,6 +60,7 @@ The current issues that implement these pillars are tracked on the [Ibuki projec
 Per-pillar design docs land under [`docs/pillars/`](docs/pillars/) as each pillar's design is locked:
 
 - Pillar 2 — [MCP server + tenant auth](docs/pillars/02-mcp-server-tenant-auth.md)
+- Pillar 4 — [Release management](docs/pillars/04-release-management.md)
 - Pillar 6 — [Agent consumption: role-chunked spec output](docs/agent-consumption.md)
 
 ## Schema
