@@ -10,6 +10,12 @@ repos:
         files: ^templates/proposal\.example\.json$
         args:
           - --schemafile
+          - schema/v0.2.0/proposal.schema.json
+      - id: check-jsonschema
+        name: Validate the v0.1.0 fixture against the v0.1.0 proposal schema
+        files: ^tests/fixtures/proposal\.v0\.1\.0\.json$
+        args:
+          - --schemafile
           - schema/v0.1.0/proposal.schema.json
 
   - repo: local
@@ -19,7 +25,7 @@ repos:
         entry: python3 scripts/check_projection_table.py
         language: system
         pass_filenames: false
-        files: ^(docs/agent-consumption\.md|schema/v0\.1\.0/(role-projections|proposal\.schema)\.json)$
+        files: ^(docs/agent-consumption\.md|schema/v0\.2\.0/(role-projections|proposal\.schema)\.json)$
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1

@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "tenant": "weyucou",
   "project": "ibuki",
   "feature_id": "feature-1-change-request-schema",
@@ -24,6 +24,9 @@
     "The schema MUST include tenant, project, feature_id, title, intent, scope (in/out), acceptance_criteria, supersedes (optional), proposer, submitted_at, and state.",
     "The schema MUST be versioned via schema_version and the version MUST be embedded in every payload.",
     "The schema MUST be reviewable as a git artifact at schema/v0.1.0/proposal.schema.json."
+  ],
+  "requirements": [
+    { "source": "github", "id": "weyucou/ibuki#1" }
   ],
   "proposer": {
     "type": "human",
