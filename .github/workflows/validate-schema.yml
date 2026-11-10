@@ -20,11 +20,14 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v3
 
-      - name: Validate schema against JSON Schema Draft 2020-12 meta-schema
-        run: uvx check-jsonschema --check-metaschema schema/v0.1.0/proposal.schema.json
+      - name: Validate schemas against JSON Schema Draft 2020-12 meta-schema
+        run: uvx check-jsonschema --check-metaschema schema/v0.1.0/proposal.schema.json schema/v0.2.0/proposal.schema.json
 
-      - name: Validate reference template against schema
-        run: uvx check-jsonschema --schemafile schema/v0.1.0/proposal.schema.json templates/proposal.example.json
+      - name: Validate reference template against schema v0.2.0
+        run: uvx check-jsonschema --schemafile schema/v0.2.0/proposal.schema.json templates/proposal.example.json
+
+      - name: Validate v0.1.0 fixture against schema v0.1.0
+        run: uvx check-jsonschema --schemafile schema/v0.1.0/proposal.schema.json tests/fixtures/proposal.v0.1.0.json
 
       - name: Confirm invalid fixture is rejected
         run: |
@@ -33,6 +36,15 @@ jobs:
             exit 1
           else
             echo "Invalid fixture correctly rejected."
+          fi
+
+      - name: Confirm duplicate requirements are rejected
+        run: |
+          if uvx check-jsonschema --schemafile schema/v0.2.0/proposal.schema.json tests/fixtures/proposal.v0.2.0.duplicate-requirements.invalid.json; then
+            echo "::error::Duplicate (source, id) requirements were accepted by the schema — uniqueness is not enforced."
+            exit 1
+          else
+            echo "Duplicate requirements correctly rejected."
           fi
 
       - name: Check the role/field table against the canonical projection map

@@ -1,0 +1,36 @@
+{
+  "description": "Canonical role -> field projection for pillar 6 (agent consumption). Agents fetch a role-scoped slice of a locked spec rather than the full document. Field paths are dotted paths into a schema v0.2.0 proposal payload; a spec locked under v0.1.0 projects through the same map, because a field the stored spec does not carry is omitted. Consumed by weyucou/ibuki-backend (vendored, drift-checked in CI); documented for humans in docs/agent-consumption.md.",
+  "schema_version": "0.2.0",
+  "complete_role": "full",
+  "roles": {
+    "plan": [
+      "feature_id",
+      "title",
+      "intent",
+      "scope.in",
+      "scope.out",
+      "acceptance_criteria",
+      "requirements",
+      "supersedes",
+      "state"
+    ],
+    "develop": [
+      "feature_id",
+      "title",
+      "intent",
+      "scope.in",
+      "acceptance_criteria",
+      "supersedes",
+      "state"
+    ],
+    "review": [
+      "feature_id",
+      "title",
+      "scope.out",
+      "acceptance_criteria",
+      "requirements",
+      "supersedes",
+      "state"
+    ]
+  }
+}
