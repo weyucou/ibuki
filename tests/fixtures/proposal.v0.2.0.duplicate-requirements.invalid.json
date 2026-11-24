@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.2.0",
+  "tenant": "weyucou",
+  "project": "ibuki",
+  "feature_id": "feature-20-duplicate-requirements",
+  "title": "Intentionally broken fixture: duplicate requirements entry",
+  "intent": "Exercise the validator. This payload must be rejected: its two requirements entries share (source, id), with keys written in a different order. Every other field is valid, so the duplicate is the only failure mode.",
+  "scope": {
+    "in": [
+      "Duplicate (source, id) detection in requirements"
+    ],
+    "out": []
+  },
+  "acceptance_criteria": [
+    "WHEN two requirements entries share (source, id), THEN the validator SHALL reject the payload."
+  ],
+  "requirements": [
+    { "source": "github", "id": "weyucou/ibuki#20" },
+    { "id": "weyucou/ibuki#20", "source": "github" }
+  ],
+  "proposer": {
+    "type": "agent",
+    "id": "ci-fixture"
+  },
+  "submitted_at": "2026-11-11T00:00:00Z",
+  "state": "proposed"
+}

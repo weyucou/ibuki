@@ -67,15 +67,15 @@ Per-pillar design docs land under [`docs/pillars/`](docs/pillars/) as each pilla
 
 The feature change-request schema (pillar 1) is the atomic unit of the ibuki workflow.
 
-- Schema: [`schema/v0.1.0/proposal.schema.json`](schema/v0.1.0/proposal.schema.json) (JSON Schema Draft 2020-12)
+- Schema: [`schema/v0.2.0/proposal.schema.json`](schema/v0.2.0/proposal.schema.json) (JSON Schema Draft 2020-12)
 - Reference payload: [`templates/proposal.example.json`](templates/proposal.example.json)
 - Field reference: [`docs/schema.md`](docs/schema.md)
-- Role projections (pillar 6): [`schema/v0.1.0/role-projections.json`](schema/v0.1.0/role-projections.json)
+- Role projections (pillar 6): [`schema/v0.2.0/role-projections.json`](schema/v0.2.0/role-projections.json)
 
 Validate a payload locally:
 
 ```bash
-uvx check-jsonschema --schemafile schema/v0.1.0/proposal.schema.json <your-proposal>.json
+uvx check-jsonschema --schemafile schema/v0.2.0/proposal.schema.json <your-proposal>.json
 ```
 
 ## Related Repositories

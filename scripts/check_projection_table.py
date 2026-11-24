@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Fail when the role/field table in docs/agent-consumption.md drifts from the canonical map.
 
-`schema/v0.1.0/role-projections.json` is what `ibuki-backend` consumes; the markdown
-table is what a human reads before deciding which role to ask for. A table that
-disagrees with the JSON is worse than no table — it describes a projection no agent
-will ever be served.
+The current schema version's `role-projections.json` (under `SCHEMA_DIR`) is what
+`ibuki-backend` consumes; the markdown table is what a human reads before deciding
+which role to ask for. A table that disagrees with the JSON is worse than no table —
+it describes a projection no agent will ever be served.
 
 Also checks that every field of the proposal schema has a row, so a field added to
 the schema cannot quietly ship without a role mapping decision.
@@ -20,8 +20,10 @@ import unicodedata
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PROJECTIONS_PATH = REPO_ROOT / "schema" / "v0.1.0" / "role-projections.json"
-SCHEMA_PATH = REPO_ROOT / "schema" / "v0.1.0" / "proposal.schema.json"
+# The table documents the current schema version; bump this when a new version ships.
+SCHEMA_DIR = REPO_ROOT / "schema" / "v0.2.0"
+PROJECTIONS_PATH = SCHEMA_DIR / "role-projections.json"
+SCHEMA_PATH = SCHEMA_DIR / "proposal.schema.json"
 DOC_PATH = REPO_ROOT / "docs" / "agent-consumption.md"
 
 TABLE_HEADER_CELL = "Field"

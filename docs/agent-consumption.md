@@ -2,22 +2,22 @@
 
 Pillar 6. Agents read a locked spec through the `ibuki.get_spec` MCP tool, asking for the slice their role needs rather than the whole document. Dumping a full spec into an agent's context wastes tokens and degrades performance over a long session — the agent forgets early requirements and hallucinates at the edges. A planner does not need acceptance criteria to draw up a plan; a reviewer does not need the intent prose to check the work against the criteria.
 
-- **Canonical projection map:** [`schema/v0.1.0/role-projections.json`](../schema/v0.1.0/role-projections.json) — machine-readable, vendored into `weyucou/ibuki-backend` and drift-checked in CI.
+- **Canonical projection map:** [`schema/v0.2.0/role-projections.json`](../schema/v0.2.0/role-projections.json) — machine-readable, vendored into `weyucou/ibuki-backend` and drift-checked in CI.
 - **Implementation:** `backend/specs/projections.py` + `backend/mcp_server/tools.py` in [`weyucou/ibuki-backend`](https://github.com/weyucou/ibuki-backend).
-- **Spec schema the projections are defined over:** [`docs/schema.md`](schema.md) (v0.1.0).
+- **Spec schema the projections are defined over:** [`docs/schema.md`](schema.md) (v0.2.0).
 
 ## Roles
 
 | Role | Who asks | What they get |
 |---|---|---|
-| `plan` | Planner agents drafting an approach | Why the feature exists and where its edges are — intent plus both sides of scope. |
-| `develop` | Developer agents writing the code | What to build and what "done" means — intent, in-scope items, acceptance criteria. Out-of-scope is omitted: a developer acts on what is in scope. |
-| `review` | Reviewer agents checking the work | What to verify — acceptance criteria plus the explicit out-of-scope list, so scope creep is visible. Intent prose is omitted so the review anchors on testable criteria. |
+| `plan` | Planner agents drafting an approach | Why the feature exists and where its edges are — intent plus both sides of scope, and the requirements the approach must cover. |
+| `develop` | Developer agents writing the code | What to build and what "done" means — intent, in-scope items, acceptance criteria. Out-of-scope and requirements are omitted: a developer acts on what is in scope and on the criteria. |
+| `review` | Reviewer agents checking the work | What to verify — acceptance criteria plus the explicit out-of-scope list, so scope creep is visible, and the requirements to check coverage against. Intent prose is omitted so the review anchors on testable criteria. |
 | `full` | Escape hatch, and the default for existing callers | The complete locked spec, unchunked. |
 
 ## Field mapping
 
-Rows are the fields of a schema v0.1.0 payload. `✓` = present in the response body, `—` = omitted.
+Rows are the fields of a schema v0.2.0 payload. `✓` = present in the response body, `—` = omitted.
 
 | Field | `plan` | `develop` | `review` | `full` |
 |---|:---:|:---:|:---:|:---:|
@@ -30,17 +30,26 @@ Rows are the fields of a schema v0.1.0 payload. `✓` = present in the response 
 | `scope.in` | ✓ | ✓ | — | ✓ |
 | `scope.out` | ✓ | — | ✓ | ✓ |
 | `acceptance_criteria` | ✓ | ✓ | ✓ | ✓ |
+| `requirements`² | ✓ | — | ✓ | ✓ |
 | `supersedes`² | ✓ | ✓ | ✓ | ✓ |
 | `proposer` | — | — | — | ✓ |
 | `submitted_at` | — | — | — | ✓ |
 | `state` | ✓ | ✓ | ✓ | ✓ |
 
 ¹ Omitted from the body for the chunked roles, but always echoed in `_meta.schema_version` — an agent never has to guess which schema version it is reading.
-² `supersedes` is optional in the schema. A projection that names a field the stored spec does not carry simply omits it; it is not emitted as `null`.
+² `requirements` and `supersedes` are optional in the schema. A projection that names a field the stored spec does not carry simply omits it; it is not emitted as `null`. A spec locked under v0.1.0 has no `requirements`, so this map serves it unchanged.
 
 `full` returns the stored document as-is, including any field not listed above. The chunked roles are strict subsets — projection only ever removes fields, never adds, renames, or summarises them. Agents that need a condensed form summarise it themselves.
 
 Both `scope.in` and `scope.out` project into a `scope` object, so `scope.in` alone yields `{"scope": {"in": [...]}}` — the shape stays recognisable against the schema.
+
+### Requirement traceability
+
+`requirements` (schema v0.2.0) lists the requirements a spec satisfies as `{source, id}` pairs: an MTHER technical requirement, a GitHub issue, or a manually recorded item ([format](schema.md#identifier-conventions)). It goes to the roles that reason about coverage:
+
+- `plan` gets it so the approach covers every requirement.
+- `review` gets it to check that the delivered work covers each one.
+- `develop` omits it: a developer acts on `acceptance_criteria`, which already state what satisfying the requirements takes.
 
 ## Tool contract
 
@@ -62,7 +71,7 @@ Tenant is never a parameter. It is pinned from the bearer token for the whole re
     "spec_id": 42,
     "name": "feature-4-agent-consumption",
     "version": 3,
-    "schema_version": "0.1.0",
+    "schema_version": "0.2.0",
     "role": "develop",
     "served_at": "2026-08-26T12:34:56Z"
   },
@@ -125,9 +134,9 @@ Tenant is never a parameter. It is pinned from the bearer token for the whole re
 Addressing by `name` throughout; `spec_id` works identically.
 
 ```jsonc
-// plan — intent and both sides of scope
+// plan — intent, both sides of scope, and the requirements to cover
 {"name": "feature-4-agent-consumption", "role": "plan"}
-// -> _meta, feature_id, title, intent, scope.in, scope.out, acceptance_criteria, supersedes?, state
+// -> _meta, feature_id, title, intent, scope.in, scope.out, acceptance_criteria, requirements?, supersedes?, state
 ```
 
 ```jsonc
@@ -137,9 +146,9 @@ Addressing by `name` throughout; `spec_id` works identically.
 ```
 
 ```jsonc
-// review — what to verify, and what not to flag
+// review — what to verify, what not to flag, and the requirements to check coverage against
 {"name": "feature-4-agent-consumption", "role": "review"}
-// -> _meta, feature_id, title, scope.out, acceptance_criteria, supersedes?, state
+// -> _meta, feature_id, title, scope.out, acceptance_criteria, requirements?, supersedes?, state
 ```
 
 ```jsonc
@@ -152,7 +161,7 @@ Addressing by `name` throughout; `spec_id` works identically.
 
 The projection map exists in three places, chained so drift fails a build rather than misleading an agent:
 
-1. **`schema/v0.1.0/role-projections.json`** (this repo) — canonical.
+1. **`schema/v0.2.0/role-projections.json`** (this repo) — canonical.
 2. **The table above** — checked against the JSON by `scripts/check_projection_table.py` in this repo's CI.
 3. **`ROLE_FIELDS` in `backend/specs/projections.py`** (`ibuki-backend`) — a literal map, asserted equal to the vendored copy of the JSON by a unit test; the vendored copy is diffed against this repo by `scripts/check-schema-drift.sh` in that repo's CI.
 

@@ -1,0 +1,35 @@
+{
+  "schema_version": "0.1.0",
+  "tenant": "weyucou",
+  "project": "ibuki",
+  "feature_id": "feature-1-change-request-schema",
+  "title": "Feature change-request schema (pillar 1)",
+  "intent": "Provide humans and remote agents a uniform, machine-validated format for proposing feature changes via MCP so the rule engine can validate uniqueness and conflicts, the LLM judge has a stable anchor for evaluation, and `ibuki check` has a target to compare code against.",
+  "scope": {
+    "in": [
+      "JSON Schema Draft 2020-12 definition for the proposal payload",
+      "Reference template that validates clean against the schema",
+      "Per-field documentation in docs/schema.md",
+      "CI: validate schema against meta-schema and template against schema"
+    ],
+    "out": [
+      "MCP transport (pillar 2)",
+      "Rule engine and LLM judge (pillar 3)",
+      "Release manifest schema (pillar 4)"
+    ]
+  },
+  "acceptance_criteria": [
+    "The schema MUST validate as JSON Schema Draft 2020-12 and be hosted at a stable path within the repository.",
+    "WHEN a proposal is submitted via MCP THEN the rule engine MUST reject any payload that fails schema validation before the LLM judge is invoked.",
+    "The schema MUST include tenant, project, feature_id, title, intent, scope (in/out), acceptance_criteria, supersedes (optional), proposer, submitted_at, and state.",
+    "The schema MUST be versioned via schema_version and the version MUST be embedded in every payload.",
+    "The schema MUST be reviewable as a git artifact at schema/v0.1.0/proposal.schema.json."
+  ],
+  "proposer": {
+    "type": "human",
+    "id": "ellen-goc",
+    "name": "Ellen"
+  },
+  "submitted_at": "2026-05-18T00:00:00Z",
+  "state": "proposed"
+}
