@@ -51,7 +51,7 @@ Submit  →  Rule check  →  LLM judge  →  Verdict  ↔  Proposer response  �
 3. **LLM judge**: on a rule pass, an LLM evaluates intent, scope, and consistency with existing locked specs. Verdict: **accept**, **reject**, or **counter-propose** (with a revised draft and reasoning).
 4. **Iterative response**: the proposer accepts the verdict, rejects it (escalates), or counter-proposes. The loop continues until convergence.
 5. **Lock**: accepted proposals become immutable and are queued for the next release.
-6. **Release cut**: a human or designated agent cuts a release manually. Everything locked since the last cut is bundled into a versioned, immutable manifest. The versioning scheme is configurable per tenant (semver / date / sequential).
+6. **Release cut**: a human or designated agent cuts a release manually. Everything locked since the last cut is bundled into a versioned, immutable manifest. The versioning scheme is configurable per project (semver / date / sequential).
 
 **Task: spec-anchored**
 
@@ -92,7 +92,7 @@ ibuki v1 is done when one weyucou project (ibuki itself) runs end to end inside 
 | 1 | Spec schema | Per-feature schema with `requirements[]` traceability; rule-validated |
 | 2 | MCP server + tenant auth | Hosted multi-tenant MCP interface; ibuki-issued tokens; per-org routing; tenant → project scoping |
 | 3 | Proposal workflow | Submit → rules → LLM judge → accept/reject/counter → lock; iterative response |
-| 4 | Release management | Manual release cuts; per-tenant versioning; immutable release manifests |
+| 4 | Release management | Manual release cuts; per-project versioning; immutable release manifests |
 | 5 | Conformance check | `ibuki check` MCP tool: code↔spec bi-directional evaluation, on agent request and at task review |
 | 6 | Agent consumption | Role-chunked spec and task output (plan/develop/review slices) over MCP |
 | 7 | Task orchestration | Native issue-like tasks: lifecycle states, claim leases, comments, requirement coverage, GitHub import |

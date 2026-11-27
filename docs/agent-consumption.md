@@ -56,13 +56,14 @@ Both `scope.in` and `scope.out` project into a `scope` object, so `scope.in` alo
 ```jsonc
 // Request
 {
-  "spec_id": 42,          // or "name": "feature-4-agent-consumption" — exactly one
-  "version": 3,           // optional; defaults to the latest locked version
-  "role": "develop"       // plan | develop | review | full (default: full)
+  "name": "feature-4-agent-consumption",  // or "spec_id": 42 — exactly one
+  "project": "ibuki",                     // required with "name"; not accepted with "spec_id"
+  "version": 3,                           // optional; defaults to the latest locked version
+  "role": "develop"                       // plan | develop | review | full (default: full)
 }
 ```
 
-Tenant is never a parameter. It is pinned from the bearer token for the whole request, which is the tenant-isolation chokepoint (pillar 2).
+Tenant is never a parameter. It is pinned from the bearer token for the whole request, which is the tenant-isolation chokepoint (pillar 2). Project is a parameter only for a `name` lookup, because a spec name is unique within its project; a `spec_id` already identifies one spec, so it takes no `project` ([pillar 2 → Project selection](pillars/02-mcp-server-tenant-auth.md#project-selection)).
 
 ```jsonc
 // Response (success)
@@ -107,12 +108,12 @@ Tenant is never a parameter. It is pinned from the bearer token for the whole re
   }
 }
 
-// Neither or both of spec_id / name supplied
+// Neither or both of spec_id / name, or project missing with name / given with spec_id
 {
   "_meta": { "served_at": "2026-08-26T12:34:56Z" },
   "error": {
     "code": "invalid_arguments",
-    "message": "Address the spec by exactly one of spec_id or name."
+    "message": "Address the spec by spec_id alone, or by name with its project."
   }
 }
 ```
@@ -121,9 +122,10 @@ Tenant is never a parameter. It is pinned from the bearer token for the whole re
 |---|---|
 | `spec_unavailable` | No locked spec is readable at that address for the calling tenant. |
 | `invalid_role` | `role` is not one of the four supported values. |
-| `invalid_arguments` | Neither or both of `spec_id` / `name` were supplied. |
+| `invalid_arguments` | Neither or both of `spec_id` / `name` were supplied, or `project` was missing with `name` or given with `spec_id`. |
+| `project_not_found` | `project` names no project in the calling tenant. |
 
-`spec_unavailable` is deliberately one code for three distinct causes — absent, owned by another tenant, or present but never locked. Distinguishing them would tell a caller that a spec it cannot read exists, which is exactly the cross-tenant existence leak the unified error closes. The server-side audit log still records the tenant mismatch separately.
+`spec_unavailable` is deliberately one code for three distinct causes — absent, owned by another tenant, or present but never locked. Distinguishing them would tell a caller that a spec it cannot read exists, which is exactly the cross-tenant existence leak the unified error closes. The server-side audit log still records the tenant mismatch separately. `project_not_found` leaks nothing across tenants either: the lookup runs inside the calling tenant, so another tenant's project and an absent one are the same miss.
 
 ### Only locked specs are served
 
@@ -131,29 +133,29 @@ Tenant is never a parameter. It is pinned from the bearer token for the whole re
 
 ## Example invocations
 
-Addressing by `name` throughout; `spec_id` works identically.
+Addressing by `name` and its `project` throughout; `spec_id` works identically, without `project`.
 
 ```jsonc
 // plan — intent, both sides of scope, and the requirements to cover
-{"name": "feature-4-agent-consumption", "role": "plan"}
+{"name": "feature-4-agent-consumption", "project": "ibuki", "role": "plan"}
 // -> _meta, feature_id, title, intent, scope.in, scope.out, acceptance_criteria, requirements?, supersedes?, state
 ```
 
 ```jsonc
 // develop — what to build, what done means
-{"name": "feature-4-agent-consumption", "role": "develop"}
+{"name": "feature-4-agent-consumption", "project": "ibuki", "role": "develop"}
 // -> _meta, feature_id, title, intent, scope.in, acceptance_criteria, supersedes?, state
 ```
 
 ```jsonc
 // review — what to verify, what not to flag, and the requirements to check coverage against
-{"name": "feature-4-agent-consumption", "role": "review"}
+{"name": "feature-4-agent-consumption", "project": "ibuki", "role": "review"}
 // -> _meta, feature_id, title, scope.out, acceptance_criteria, requirements?, supersedes?, state
 ```
 
 ```jsonc
 // full — the complete locked document, at a pinned version
-{"name": "feature-4-agent-consumption", "version": 3, "role": "full"}
+{"name": "feature-4-agent-consumption", "project": "ibuki", "version": 3, "role": "full"}
 // -> _meta, plus every stored field
 ```
 
