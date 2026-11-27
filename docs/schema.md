@@ -23,7 +23,7 @@ A v0.1.0 payload keeps validating against `schema/v0.1.0/`; the v0.2.0 schema re
 |---|---|---|---|
 | `schema_version` | string (const `"0.2.0"`) | yes | Schema version this payload conforms to. |
 | `tenant` | string | yes | GitHub org slug (one tenant per org). Lowercase letters, digits, hyphens; max 39 chars. |
-| `project` | string | yes | GitHub repo name within the tenant org. Up to 100 chars; `A–Z`, `a–z`, `0–9`, `.`, `_`, `-`. |
+| `project` | string | yes | GitHub repo name within the tenant org. Up to 100 chars; `A–Z`, `a–z`, `0–9`, `.`, `_`, `-`. On submit it resolves, case-insensitively, to the tenant's ibuki `Project` of that name; an unknown name is rejected with `project_not_found` ([pillar 2 → Project selection](pillars/02-mcp-server-tenant-auth.md#project-selection)). |
 | `feature_id` | string | yes | Kebab-case slug, unique within `(tenant, project)`. Convention: `feature-NNN-short-description`. 2–64 chars. |
 | `title` | string | yes | Short human-readable title (≤ 200 chars). |
 | `intent` | string | yes | Why the feature exists — the outcome or problem it addresses. Free-form prose. |

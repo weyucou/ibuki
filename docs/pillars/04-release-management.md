@@ -1,10 +1,10 @@
 # Pillar 4 — Release Management
 
-Locked design for release cuts. A human or designated agent calls `ibuki.cut_release`, and every spec version locked since the previous cut is frozen into a single named, versioned, immutable manifest. The versioning scheme is per-tenant configurable (semver / date / sequential).
+Locked design for release cuts. A human or designated agent calls `ibuki.cut_release` for a project, and every spec version locked in that project since its previous cut is frozen into a single named, versioned, immutable manifest. The versioning scheme is configurable per project (semver / date / sequential).
 
 Pillar 4 also owns the **lock** step that produces those cut-eligible units: `ibuki.lock` turns an `accepted` proposal into a locked `specs.SpecVersion`.
 
-Sourced from [issue #10](https://github.com/weyucou/ibuki/issues/10) and the 2026-05-20 architecture re-scope, then grounded against `weyucou/ibuki-backend@main` (`9ec13c7`) — `tenants/models.py`, `specs/models.py`, `proposals/models.py`, `proposals/states.py`, `mcp_server/{tools,context,auth}.py`, `conformance/schemas.py`, `pyproject.toml`, `.github/workflows/ci.yml`.
+Sourced from [issue #10](https://github.com/weyucou/ibuki/issues/10) and the 2026-05-20 architecture re-scope, then grounded against `weyucou/ibuki-backend@main` (`9ec13c7`) — `tenants/models.py`, `specs/models.py`, `proposals/models.py`, `proposals/states.py`, `mcp_server/{tools,context,auth}.py`, `conformance/schemas.py`, `pyproject.toml`, `.github/workflows/ci.yml`. [Issue #24](https://github.com/weyucou/ibuki/issues/24) then replaced the tenant-only scoping with project-scoped releases, grounded against `ca48e0d`.
 
 ## Status
 
@@ -13,31 +13,31 @@ Sourced from [issue #10](https://github.com/weyucou/ibuki/issues/10) and the 202
 | [DECISION A — Postgres (RDS) via Django ORM](https://github.com/weyucou/ibuki/issues/8#issuecomment-4495898016) | locked (shared with pillars 2/3) |
 | [DECISION B — 3-repo split](https://github.com/weyucou/ibuki/issues/8#issuecomment-4495898161) | locked (shared with pillar 2) |
 | Bundled unit is a locked `specs.SpecVersion` (not a `Proposal`) | locked — grounded, see [What grounding changed](#what-grounding-changed) |
-| Tenant-only scoping (no `Project`) | locked — grounded |
-| Scheme config is a `Tenant` field via Django admin (no MCP setter) | locked — grounded |
-| `name=` override must match the tenant's scheme | locked by the issue's own acceptance criteria (`VERSION_MISMATCH`) |
-| **DECISION 1 — where `ibuki.lock` gets the accepted content** | **open — blocks child 4 only.** Recommendation (a): [ibuki-backend#18](https://github.com/weyucou/ibuki-backend/issues/18) persists the accepted payload |
+| Project-scoped releases `(tenant, project)` | locked — [#24](https://github.com/weyucou/ibuki/issues/24) |
+| Scheme config is a `Project` field via Django admin (no MCP setter) | locked — [#24](https://github.com/weyucou/ibuki/issues/24) |
+| `name=` override must match the project's scheme | locked by the issue's own acceptance criteria (`VERSION_MISMATCH`) |
+| DECISION 1 — where `ibuki.lock` gets the accepted content | resolved — (a): [ibuki-backend#18](https://github.com/weyucou/ibuki-backend/issues/18) shipped `Proposal.payload` |
 | DECISION 3 — date-scheme exhaustion past `-Z` | open — child 2's call. Recommendation: fail with `VERSION_EXHAUSTED` |
 | Cut-window watermark (late-committing locks) | open — child 3, see [Open items](#open-items) |
 
-Design (data model, manifest contract, versioning, concurrency, immutability) is **locked**. Children 1–3 are unblocked today; only child 4 waits on DECISION 1.
+Design (data model, manifest contract, versioning, concurrency, immutability) is **locked**, and project-scoped since [#24](https://github.com/weyucou/ibuki/issues/24). With DECISION 1 resolved, no child is blocked on a decision: DECISION 3 and the watermark are calls the owning child makes. The [child issue split](#child-issue-split) lists what each child depends on.
 
 ## What grounding changed
 
 The 2026-05-20 plan targeted an `ibuki/release/` package in this repo with hand-written SQL and `(tenant, project)` scoping. Three facts in the shipped tree changed the design rather than just its file paths:
 
-1. **There is no `Project` model.** `Spec` is unique on `(tenant, name)`, `Proposal` on `(tenant, feature_id)`. `project` is dropped from every signature, model and acceptance criterion.
+1. **There was no `Project` model.** `Spec` was unique on `(tenant, name)` and `Proposal` claimed `feature_id` per tenant, so the first lock dropped `project` from every signature, model and acceptance criterion. [#24](https://github.com/weyucou/ibuki/issues/24) adds `Project` under `Tenant` ([pillar 2 → Project model](02-mcp-server-tenant-auth.md#project-model)) and restores `(tenant, project)` scoping: a release, its versioning scheme and its cut lock are all per project.
 2. **The cut-eligible unit is a locked `specs.SpecVersion`.** `ProposalState` has no `locked` member — its terminal accept state is `accepted`. `specs/models.py` ships `locked_at` and its module docstring names this issue as the consumer of `(tenant, name, version)`.
 3. **The lock step is pillar-4 scope and is the critical path.** The `ibuki.lock` stub is labelled "(pillar 4)" in `mcp_server/tools.py`, and nothing in pillar 3 writes a `SpecVersion`. Without the lock step there is never anything to cut.
 
 | Area | Was (2026-05-20) | Now (grounded) |
 |---|---|---|
 | Home | `ibuki/release/` in this repo | new Django app `backend/releases/` in `ibuki-backend`, per the `proposals` / `conformance` one-app-per-pillar precedent |
-| Scoping | `(tenant, project)` | `tenant` only |
+| Scoping | `(tenant, project)` | `(tenant, project)`: tenant-only at the first lock, restored by #24 |
 | Bundled unit | `proposals[]` locked since last cut | `items[]` — locked `specs.SpecVersion` rows |
 | Storage | hand-written `CREATE TABLE` DDL | Django models + `makemigrations`; Postgres 17 in CI, `pytest-django` |
-| Scheme config | `tenant_release_config` table + `ibuki.set_release_scheme` tool | `Tenant.versioning_scheme` field via Django admin, matching shipped `judge_model` / `check_token_budget` — **the tool is dropped** |
-| Concurrency | `SERIALIZABLE` + retry | `select_for_update(nowait=True)` on the tenant row inside `transaction.atomic()` |
+| Scheme config | `tenant_release_config` table + `ibuki.set_release_scheme` tool | `Project.versioning_scheme` field via Django admin (#24), the pattern of the shipped `judge_model` / `check_token_budget` tenant fields — **the tool is dropped** |
+| Concurrency | `SERIALIZABLE` + retry | `select_for_update(nowait=True)` on the project row inside `transaction.atomic()` |
 | Immutability | Postgres role grants, tested by asserting permission denied | application layer, mirroring shipped `ProposalEvent` and `SpecVersion`; grants stay deferred to [ibuki-backend#14](https://github.com/weyucou/ibuki-backend/issues/14) |
 | Models | pydantic `frozen=True` as storage | Django models for storage; pydantic only for the MCP wire contract |
 
@@ -46,15 +46,15 @@ The 2026-05-20 plan targeted an `ibuki/release/` package in this repo with hand-
 The twelve acceptance criteria in [issue #10](https://github.com/weyucou/ibuki/issues/10). In brief:
 
 - `ibuki.lock` materialises a `specs.SpecVersion` from an `accepted` proposal and sets `locked_at` (one-way), making it cut-eligible.
-- `ibuki.cut_release(name?)` bundles every spec version the calling tenant locked between the previous cut and now into one immutable manifest.
-- The manifest carries `release_id`, `tenant`, `version`, `scheme`, `cut_at`, `cut_by`, `items[]` (ordered by `locked_at` ASC), `predecessor_release_id`, `manifest_hash`.
-- Versioning is per-tenant: `semver`, `date`, or `sequential`. An omitted `name` auto-generates; a supplied `name` is validated against the scheme and a mismatch is rejected with `VERSION_MISMATCH`.
+- `ibuki.cut_release(project, name?)` bundles every spec version locked in that project between its previous cut and now into one immutable manifest.
+- The manifest carries `release_id`, `tenant`, `project`, `version`, `scheme`, `cut_at`, `cut_by`, `items[]` (ordered by `locked_at` ASC), `predecessor_release_id`, `manifest_hash`.
+- Versioning is per project: `semver`, `date`, or `sequential`. An omitted `name` auto-generates; a supplied `name` is validated against the scheme and a mismatch is rejected with `VERSION_MISMATCH`.
 - A manifest is immutable once cut — no edits, no reorders, no late additions. Corrections happen via a new release.
 - Nothing locked since the last cut → `EMPTY_RELEASE`. There are no empty releases.
-- Two racing cuts for one tenant → exactly one succeeds; the loser gets `CONCURRENT_CUT`.
+- Two racing cuts on one project → exactly one succeeds; the loser gets `CONCURRENT_CUT`. Cuts on two projects of one tenant do not contend.
 - Manifests are readable via `ibuki.get_release` and `ibuki.list_releases`.
 - A spec version referenced by a cut release cannot be deleted.
-- Every tool reads its tenant from `mcp_server.context.current_tenant()`; no release tool accepts a tenant argument.
+- Every tool reads its tenant from `mcp_server.context.current_tenant()`; no release tool accepts a tenant argument. `cut_release` and `list_releases` name their project; `get_release` and `lock` take it from the row ([MCP surface](#mcp-surface)).
 
 ## Architecture decisions
 
@@ -63,10 +63,10 @@ The twelve acceptance criteria in [issue #10](https://github.com/weyucou/ibuki/i
 | Module home | `backend/releases/` Django app in `weyucou/ibuki-backend` | One app per pillar, matching `proposals` and `conformance` |
 | Public identifier | `Release.release_id` is a `UUIDField` generated in Python **before** insert; the integer pk stays internal for FKs | The manifest contains its own `release_id` and is hashed before the row is written — a DB-assigned id would force an UPDATE, which the append-only guard rejects. A UUID also keeps one tenant's cut volume from being inferred off a shared sequence |
 | Manifest storage | `manifest_json` holds the hashed document verbatim, alongside `manifest_hash` | A stored manifest can always be re-hashed and compared; the hash is never recomputed from live rows |
-| Scheme storage | `Tenant.versioning_scheme` (`TextChoices`), edited in Django admin | Matches shipped `judge_model` and `check_token_budget`; neither has an MCP setter |
-| Scheme freezing | `Release.scheme` copies the tenant's scheme at cut time | A tenant that switches schemes must not retroactively re-describe past releases |
+| Scheme storage | `Project.versioning_scheme` (`TextChoices`), edited in Django admin. No tenant default and no inheritance | Matches the shipped `judge_model` and `check_token_budget` admin fields; neither has an MCP setter. One home means a scheme is set in one place |
+| Scheme freezing | `Release.scheme` copies the project's scheme at cut time | A project that switches schemes must not retroactively re-describe past releases |
 | Versioning functions | Pure `next_version(scheme, previous, now) -> str` / `validate_version(scheme, version, previous)` in `releases/versioning.py` | No ORM, so they test as `SimpleTestCase` and take `hypothesis` property tests |
-| Concurrency | `Tenant.objects.select_for_update(nowait=True)` inside `transaction.atomic()` | Django does not manage isolation per transaction and raising it globally is invasive; `nowait` surfaces the race deterministically as a `DatabaseError` to translate into `CONCURRENT_CUT`. `UniqueConstraint(tenant, version)` is the backstop |
+| Concurrency | `Project.objects.select_for_update(nowait=True)` inside `transaction.atomic()` | Django does not manage isolation per transaction and raising it globally is invasive; `nowait` surfaces the race deterministically as a `DatabaseError` to translate into `CONCURRENT_CUT`. Locking the project row, not the tenant row, lets two projects in one tenant cut at once. `UniqueConstraint(project, version)` is the backstop |
 | Idempotency | None. `cut_release` is deliberately not client-retry-safe | Two cuts seconds apart yield one release and then `EMPTY_RELEASE`. The row lock, not an idempotency key, prevents double-counting |
 | Immutability | Application layer: `save()` on an existing row, queryset `update()`, and `delete()` all raise `ReleaseImmutableError` | Mirrors the shipped `ProposalEvent` append-only and `SpecVersion` lock patterns |
 | Retention | `ReleaseItem.spec_version` is `on_delete=PROTECT` | `Spec` → `SpecVersion` is CASCADE, so deleting a referenced `Spec` raises `ProtectedError` instead of orphaning the manifest. Closes the retention gap `specs/models.py` labels pillar-4 scope, with no change to the `specs` app |
@@ -84,6 +84,7 @@ The twelve acceptance criteria in [issue #10](https://github.com/weyucou/ibuki/i
 class Release(models.Model):
     release_id = UUIDField(default=uuid4, editable=False, unique=True)   # public handle; in the manifest
     tenant = FK(Tenant, on_delete=CASCADE, related_name="releases")
+    project = FK(Project, on_delete=PROTECT, related_name="releases")   # #24; a cut release keeps its project
     version = CharField(max_length=64)
     scheme = CharField(max_length=16, choices=VersioningScheme.choices)  # frozen at cut time
     cut_at = DateTimeField()                                             # explicit: it is manifest content
@@ -92,7 +93,7 @@ class Release(models.Model):
     manifest_hash = CharField(max_length=64)                             # sha256 hex
     manifest_json = JSONField()                                          # the hashed document, verbatim
     lock_watermark = DateTimeField(null=True)                            # max(item.locked_at); child 3 populates — see open item 3
-    # UniqueConstraint(tenant, version); Index(tenant, -cut_at)
+    # UniqueConstraint(project, version); Index(project, -cut_at)
 
 class ReleaseItem(models.Model):
     release = FK(Release, on_delete=PROTECT, related_name="items")
@@ -105,7 +106,7 @@ class ReleaseItem(models.Model):
     # UniqueConstraint(release, spec_version)
 ```
 
-`backend/tenants/models.py` gains one field, in migration `0004_tenant_versioning_scheme` (the app is at `0003_tenant_check_token_budget`):
+`Project` (`backend/tenants/models.py`, [pillar 2 → Project model](02-mcp-server-tenant-auth.md#project-model)) gains the scheme field in migration `tenants/0008_project_versioning_scheme`, after `0006_project` and `0007_backfill_default_project` ([ibuki-backend#50](https://github.com/weyucou/ibuki-backend/issues/50)):
 
 ```python
 versioning_scheme = CharField(max_length=16, choices=VersioningScheme.choices, default=VersioningScheme.SEMVER)
@@ -113,16 +114,16 @@ versioning_scheme = CharField(max_length=16, choices=VersioningScheme.choices, d
 
 `content_hash` is computed at cut time — neither `SpecVersion` nor `Proposal` stores a hash today. It is SHA-256 over the canonical JSON of `SpecVersion.content`.
 
-The item fields are denormalised deliberately. A manifest is an artifact downstream consumers read years later; resolving `spec_name` through a live FK would let a rename rewrite history that is supposed to be frozen.
+The item fields are denormalised deliberately. A manifest is an artifact downstream consumers read years later; resolving `spec_name` through a live FK would let a rename rewrite history that is supposed to be frozen. The manifest's `project` field is frozen the same way: it holds the project's name at cut time, so renaming a backfilled `default` project ([pillar 2 → Migration path](02-mcp-server-tenant-auth.md#migration-path)) does not rewrite a manifest already cut. A release never bundles more than one project.
 
 ## The lock step — `ibuki.lock`
 
-Given an `accepted` `proposals.Proposal` owned by the calling tenant:
+Given an `accepted` `proposals.Proposal` owned by the calling tenant, the spec lands in the proposal's own project:
 
 ```python
-spec, _ = Spec.objects.get_or_create(tenant=current_tenant(), name=proposal.feature_id)
-version = spec.add_version(content)   # content source is DECISION 1
-version.lock()                        # sets locked_at; one-way
+spec, _ = Spec.objects.get_or_create(tenant=current_tenant(), project=proposal.project, name=proposal.feature_id)
+version = spec.add_version(proposal.payload)   # the accepted content (DECISION 1)
+version.lock()                                 # sets locked_at; one-way
 ```
 
 Both `Spec.add_version()` and `SpecVersion.lock()` ship today. `add_version()` wraps its read-then-insert in a transaction guarded by `unique_spec_version`, so two concurrent locks on one spec surface as an `IntegrityError` rather than silently reusing a version number.
@@ -135,7 +136,7 @@ Rejections, all structured:
 | Proposal owned by another tenant | `TENANT_MISMATCH` |
 | The proposal's version is already locked (`SpecLockedError`) | `ALREADY_LOCKED` |
 
-**DECISION 1 gates the `content` argument.** `proposals.Proposal` persists `tenant`, `feature_id`, `supersedes`, `scope_in`, `scope_in_normalised`, `state`, `round` and timestamps — and **no payload**. The submitted payload flows through `rules.run_rules` and `judge.invoke_judge` in memory and is never stored, so an accepted proposal cannot currently be turned back into spec content. This is a gap in the pillar-3 → pillar-1 handoff, not a pillar-4 design choice.
+**DECISION 1 resolved to (a).** [ibuki-backend#18](https://github.com/weyucou/ibuki-backend/issues/18) stores the submitted payload on `Proposal.payload` and keeps it current through every counter round, so an `accepted` row already carries the content `ibuki.lock` writes.
 
 ## Versioning — `releases/versioning.py`
 
@@ -156,7 +157,7 @@ class VersioningScheme(models.TextChoices):   # TextChoices: it backs a model fi
 
 `next_version` and `validate_version` are pure functions of `(scheme, previous_version, now_utc)`. Property tests cover monotonicity (`next_version(prev) > prev` under each scheme's ordering) and round-trip (`validate_version(scheme, next_version(scheme, prev, now), prev)` never raises). `hypothesis` is already a dev dependency.
 
-A supplied `name` must match the tenant's scheme — the issue's acceptance criteria mandate `VERSION_MISMATCH` on a mismatch. The scheme is the tenant's contract, and `list_releases` ordering assumes it.
+A supplied `name` must match the project's scheme — the issue's acceptance criteria mandate `VERSION_MISMATCH` on a mismatch. The scheme is the project's contract, and `list_releases` ordering assumes it.
 
 ## Manifest hashing — `releases/manifest.py`
 
@@ -170,12 +171,12 @@ where `document` is every manifest field **except** `manifest_hash`, with dateti
 
 ## `cut_release` flow — `releases/service.py`
 
-1. `transaction.atomic()`, then `Tenant.objects.select_for_update(nowait=True).get(pk=tenant.pk)`. A concurrent cut fails fast with a `DatabaseError`, translated to `CONCURRENT_CUT`.
-2. Load the tenant's `versioning_scheme` and its most recent `Release` — the predecessor.
+1. `transaction.atomic()`, then `Project.objects.select_for_update(nowait=True).get(pk=project.pk)`, where `project` was resolved inside the calling tenant. A concurrent cut on the same project fails fast with a `DatabaseError`, translated to `CONCURRENT_CUT`; a cut on another project locks another row and proceeds.
+2. Load the project's `versioning_scheme` and its most recent `Release` — the predecessor.
 3. Select the items:
    ```python
    SpecVersion.objects.select_related("spec").filter(
-       spec__tenant=tenant,
+       spec__project=project,
        locked_at__isnull=False,
        locked_at__gt=predecessor.cut_at,   # omitted when there is no predecessor
    ).order_by("locked_at", "pk")
@@ -186,7 +187,7 @@ where `document` is every manifest field **except** `manifest_hash`, with dateti
 4. Empty → `EmptyReleaseError` (`EMPTY_RELEASE`).
 5. Resolve the version: validate `name` against the scheme if supplied, else `next_version(...)`.
 6. Generate `release_id` (UUID) and `cut_at`, build the manifest document, compute `manifest_hash`, then insert the `Release` and its `ReleaseItem` rows — one write each, no follow-up UPDATE.
-7. Commit. `UniqueConstraint(tenant, version)` catches any surviving race as `VERSION_TAKEN`.
+7. Commit. `UniqueConstraint(project, version)` catches any surviving race as `VERSION_TAKEN`.
 
 ## Immutability and retention
 
@@ -200,6 +201,7 @@ Enforcement mirrors what already ships in `proposals` and `specs`:
 | `ReleaseItem` — same three paths | raises `ReleaseImmutableError` |
 | `Spec.delete()` where a version is in a manifest | raises Django's `ProtectedError` via `ReleaseItem.spec_version` |
 | `Release.delete()` where a successor points at it | raises `ProtectedError` via `predecessor` |
+| `Project.delete()` while a release references it | raises `ProtectedError` via `Release.project` |
 
 Raw SQL, `bulk_update()` and cascade deletes still bypass application-layer guards. The INSERT/SELECT-only DB grants that close those paths are owned by the deployment work ([ibuki-backend#14](https://github.com/weyucou/ibuki-backend/issues/14)) — the same deferral `proposals/models.py` documents for `ProposalEvent`.
 
@@ -210,15 +212,15 @@ Four tools in the existing `backend/mcp_server/tools.py`, registered in `build_m
 | Tool | Input | Output |
 |---|---|---|
 | `ibuki.lock` | `{ proposal_id }` | `{ spec_id, name, version, locked_at }` or structured error |
-| `ibuki.cut_release` | `{ name? }` | `{ release: ReleaseManifest }` or structured error |
+| `ibuki.cut_release` | `{ project, name? }` | `{ release: ReleaseManifest }` or structured error |
 | `ibuki.get_release` | `{ release_id }` | `{ found, release }` — absent is a well-formed result |
-| `ibuki.list_releases` | `{ limit?, before_cut_at? }` | `{ releases: [...], next_cursor? }` — newest first, cursor on `cut_at` |
+| `ibuki.list_releases` | `{ project, limit?, before_cut_at? }` | `{ releases: [...], next_cursor? }` — newest first, cursor on `cut_at` |
 
-No tool takes a `tenant` or `project` argument. `get_release` and `list_releases` filter on `tenant=current_tenant()`; a `release_id` owned by another tenant returns `{"found": false, "release": null}` — not-found rather than `TENANT_MISMATCH`, so the response does not confirm the id exists — and emits a `tool.tenant_mismatch` warning log, matching the shipped `_get_spec_by_id()` precedent. `mcp_server/auth.py` already resolves the bearer token to an `ApiToken` but binds only `api_token.tenant` into the tenant context; child 4 extends `mcp_server/context.py` with `current_token()` so `cut_by` can never be client-supplied.
+No tool takes a `tenant` argument. `cut_release` and `list_releases` take a required `project`, resolved as `Project.objects.get(tenant=current_tenant(), name=…)`; an unknown name and another tenant's project both return `PROJECT_NOT_FOUND`, so the response never confirms that a project exists. `get_release` and `lock` take no `project`: the `release_id` / `proposal_id` row already belongs to one ([pillar 2 → Project selection](02-mcp-server-tenant-auth.md#project-selection)). `get_release` filters on `tenant=current_tenant()`; a `release_id` owned by another tenant returns `{"found": false, "release": null}` — not-found rather than `TENANT_MISMATCH`, so the response does not confirm the id exists — and emits a `tool.tenant_mismatch` warning log, matching the shipped `_get_spec_by_id()` precedent. `mcp_server/auth.py` already resolves the bearer token to an `ApiToken` but binds only `api_token.tenant` into the tenant context; child 4 extends `mcp_server/context.py` with `current_token()` so `cut_by` can never be client-supplied.
 
 `ReleaseErrorCode` (`StrEnum`, SCREAMING values, per `conformance.schemas.CheckErrorCode`):
 
-`EMPTY_RELEASE` · `CONCURRENT_CUT` · `VERSION_MISMATCH` · `VERSION_TAKEN` · `VERSION_EXHAUSTED` · `RELEASE_NOT_FOUND` · `PROPOSAL_NOT_ACCEPTED` · `ALREADY_LOCKED` · `TENANT_MISMATCH`
+`EMPTY_RELEASE` · `CONCURRENT_CUT` · `VERSION_MISMATCH` · `VERSION_TAKEN` · `VERSION_EXHAUSTED` · `RELEASE_NOT_FOUND` · `PROPOSAL_NOT_ACCEPTED` · `ALREADY_LOCKED` · `TENANT_MISMATCH` · `PROJECT_NOT_FOUND`
 
 `ALREADY_LOCKED` is one code more than the epic enumerates. `SpecVersion.lock()` raises `SpecLockedError` on an already-locked row, so that path exists whether or not it is named; leaving it unnamed would surface it as an internal error.
 
@@ -251,7 +253,7 @@ weyucou/ibuki-backend/
 │   │   ├── migrations/0001_initial.py
 │   │   └── tests/{test_models,test_versioning,test_manifest,test_cut_release,
 │   │              test_immutability,test_tools}.py
-│   ├── tenants/migrations/0004_tenant_versioning_scheme.py
+│   ├── tenants/migrations/0008_project_versioning_scheme.py
 │   └── mcp_server/
 │       ├── tools.py                    # EXISTING — real lock + cut_release; new get_release/list_releases
 │       └── context.py                  # EXISTING — add current_token() for cut_by
@@ -260,12 +262,14 @@ weyucou/ibuki-backend/
 
 ## Child issue split
 
-The epic stays in `weyucou/ibuki`; the four children land in `weyucou/ibuki-backend` and take the next free numbers (the repo is at **#31**). This mirrors pillar 3 (`#11`/`#12`/`#16`/`#17`/`#18`) and pillar 5 (`#26`–`#29`): one PR-able slice per develop budget, since this epic is `complexity:complex`. All four share the DoD: gitleaks, ruff, pyright, pytest, security checklist.
+The epic stays in `weyucou/ibuki`; the four children land in `weyucou/ibuki-backend` (children 1 and 2 are #48 and #50). This mirrors pillar 3 (`#11`/`#12`/`#16`/`#17`/`#18`) and pillar 5 (`#26`–`#29`): one PR-able slice per develop budget, since this epic is `complexity:complex`. All four share the DoD: gitleaks, ruff, pyright, pytest, security checklist.
 
-1. **`releases` app scaffold** (`complexity:medium`) — `Release` + `ReleaseItem`, immutability enforcement, `manifest.py` hashing, `admin.py`, `0001_initial`. No dependencies; can start immediately.
-2. **Versioning schemes + `Tenant.versioning_scheme`** (`complexity:medium`) — `versioning.py` pure functions, `hypothesis` property tests, `tenants/0004`. Runs in parallel with child 1.
-3. **`cut_release` service** (`complexity:medium`) — selection query, row lock, empty refusal, concurrent-cut path. *Depends on children 1 and 2.*
-4. **MCP wiring + docs** (`complexity:medium`) — real `ibuki.lock` + `ibuki.cut_release`, new `ibuki.get_release` / `ibuki.list_releases`, `current_token()` binding for `cut_by`, `docs/release-management.md`. *Depends on child 3, on DECISION 1, and on [ibuki-backend#18](https://github.com/weyucou/ibuki-backend/issues/18).*
+1. **[ibuki-backend#48](https://github.com/weyucou/ibuki-backend/issues/48) — `releases` app scaffold** (`complexity:medium`) — `Release` + `ReleaseItem`, immutability enforcement, `manifest.py` hashing, `admin.py`, `0001_initial`. No dependencies; can start immediately.
+2. **[ibuki-backend#50](https://github.com/weyucou/ibuki-backend/issues/50) — Versioning schemes + `Project.versioning_scheme`** (`complexity:medium`) — `versioning.py` pure functions, `hypothesis` property tests, `tenants/0008`. *Depends on child 1 and on [ibuki-backend#51](https://github.com/weyucou/ibuki-backend/issues/51) (`Project`).*
+3. **`cut_release` service** (`complexity:medium`) — selection query, project-row lock, empty refusal, concurrent-cut path, and the manifest document with its frozen `project` name. *Depends on children 1 and 2, and on [ibuki-backend#54](https://github.com/weyucou/ibuki-backend/issues/54) (`Release.project`).*
+4. **MCP wiring + docs** (`complexity:medium`) — real `ibuki.lock` + `ibuki.cut_release`, new `ibuki.get_release` / `ibuki.list_releases`, `current_token()` binding for `cut_by`, `docs/release-management.md`. *Depends on child 3 and on [ibuki-backend#52](https://github.com/weyucou/ibuki-backend/issues/52) (project selection).*
+
+Project scoping ([#24](https://github.com/weyucou/ibuki/issues/24)) adds [ibuki-backend#54](https://github.com/weyucou/ibuki-backend/issues/54) — `Release.project`, the `(project, version)` key and `Index(project, -cut_at)` (`complexity:simple`; *depends on #51 and #48*) — and re-scopes child 2 from `Tenant` to `Project`. Children 3 and 4 are not filed yet; they take the project-scoped design above when they are. The full project-scoping split is in [pillar 2 → Child issue split](02-mcp-server-tenant-auth.md#child-issue-split).
 
 ## Testing strategy
 
@@ -275,7 +279,7 @@ The epic stays in `weyucou/ibuki`; the four children land in `weyucou/ibuki-back
 | Bundle everything locked since the predecessor | `test_cut_release.py::test_cut_includes_versions_locked_since_predecessor` |
 | Manifest fields present | `test_manifest.py::test_required_fields_present` |
 | Manifest hash stable under field reordering | `test_manifest.py::test_hash_is_order_independent` |
-| Per-tenant scheme | `test_versioning.py::test_next_version_per_scheme` (parametrised) + `hypothesis` monotonicity |
+| Per-project scheme | `test_versioning.py::test_next_version_per_scheme` (parametrised) + `hypothesis` monotonicity |
 | Auto-version when `name` omitted | `test_cut_release.py::test_auto_version_when_name_omitted` |
 | `name` validated against the scheme | `test_cut_release.py::test_name_override_rejected_on_scheme_mismatch` |
 | Immutability | `test_immutability.py::test_release_save_rejected`, `::test_release_queryset_update_rejected`, `::test_release_delete_rejected` |
@@ -283,17 +287,20 @@ The epic stays in `weyucou/ibuki`; the four children land in `weyucou/ibuki-back
 | Empty refusal | `test_cut_release.py::test_empty_release_raises_structured_error` |
 | Queryable via MCP | `test_tools.py::test_get_and_list_round_trip` |
 | Concurrent cut | `test_cut_release.py::test_concurrent_cut_returns_structured_error` (two connections, `TransactionTestCase`) |
+| Cuts on two projects do not contend | `test_cut_release.py::test_concurrent_cuts_on_two_projects_both_succeed` (two connections, `TransactionTestCase`) |
 | Tenant isolation | `test_tools.py::test_list_releases_excludes_other_tenant` |
+| Project isolation | `test_tools.py::test_list_releases_excludes_other_project` |
+| Another tenant's project is not found | `test_tools.py::test_cut_release_other_tenant_project_not_found` |
 | Cross-tenant `release_id` is not-found | `test_tools.py::test_get_release_excludes_other_tenant` |
 
-The concurrency test needs two real connections, so it is a `TransactionTestCase` against Postgres 17 in CI — `select_for_update(nowait=True)` is unobservable inside a single wrapped transaction.
+The concurrency tests need two real connections, so they are `TransactionTestCase`s against Postgres 17 in CI — `select_for_update(nowait=True)` is unobservable inside a single wrapped transaction.
 
 ## Out of scope (v1)
 
 - Automatic / time-based release cuts (deferred per [#6](https://github.com/weyucou/ibuki/issues/6) — v1 is manual only)
 - Release rollback or "un-cut" — the answer is a new release; the old one stays immutable
 - Changelog rendering — the manifest is the source, rendering is a downstream consumer concern
-- Cross-tenant release bundling — one release, one tenant
+- Cross-tenant or cross-project release bundling — one release, one project
 - Webhook / outbound notification of "release cut" events
 - Postgres role grants revoking `UPDATE` / `DELETE` — owned by [ibuki-backend#14](https://github.com/weyucou/ibuki-backend/issues/14)
 - An MCP setter for the versioning scheme — Django admin, matching `judge_model` and `check_token_budget`
@@ -302,8 +309,8 @@ The concurrency test needs two real connections, so it is a `TransactionTestCase
 
 Resolve before or within the child issues named:
 
-1. **DECISION 1 — accepted-payload source for `ibuki.lock`** (blocks child 4). Options, from the epic:
-   - **(a) [ibuki-backend#18](https://github.com/weyucou/ibuki-backend/issues/18) persists the accepted payload on `Proposal` — recommended.** #18 already owns the `submit`/`respond` engine that holds the payload and applies counter-proposal merges; it is the only place the final accepted content exists. One `JSONField` + migration there, and `ibuki.lock` reads it.
+1. **DECISION 1 — accepted-payload source for `ibuki.lock`: resolved, (a).** [ibuki-backend#18](https://github.com/weyucou/ibuki-backend/issues/18) shipped `Proposal.payload`. Options, from the epic:
+   - **(a) [ibuki-backend#18](https://github.com/weyucou/ibuki-backend/issues/18) persists the accepted payload on `Proposal` — chosen.** #18 already owns the `submit`/`respond` engine that holds the payload and applies counter-proposal merges; it is the only place the final accepted content exists. One `JSONField` + migration there, and `ibuki.lock` reads it.
    - (b) `ibuki.lock` takes the content as a tool argument — re-opens the trust boundary the rule engine closed, and lets a caller lock content the judge never saw. Not recommended.
    - (c) Pillar 4 adds the field to `proposals` itself — cross-pillar model ownership, and #18 would still have to write it.
 2. **DECISION 3 — date-scheme exhaustion** (child 2). 27+ cuts in one calendar month: fail with `VERSION_EXHAUSTED` (plan default, recommended) or auto-extend to `-AA`, `-AB`, …? 27 cuts in a month is a signal, not a case to accommodate silently. Trivial to relax later.
